@@ -3,6 +3,11 @@ import { EchartsOption } from "koishi-plugin-puppeteer-echarts";
 
 export const name = 'iirose-stock-monitor';
 
+export const inject = {
+  optional: ['echarts'],
+  required: ['logger', 'i18n']
+}
+
 export const usage = `
 ---
 
@@ -15,8 +20,7 @@ v0.0.7版本后，支持图表显示功能，若不习惯使用，请切换为v0
 `;
 
 // 股票数据接口
-export interface StockData
-{
+export interface StockData {
   unitPrice: number;
   totalStock: number;
   personalStock: number;
@@ -26,15 +30,13 @@ export interface StockData
 
 // 扩展 Koishi 事件
 declare module 'koishi' {
-  interface Events
-  {
+  interface Events {
     'iirose/stock-update'(data: StockData): void;
   }
 }
 
 // 插件配置接口
-export interface Config
-{
+export interface Config {
   botTable?: { botId: string; channelId: string; }[];
   enableSuggestion?: boolean;
   sendTextAfterCrash?: boolean;
@@ -75,8 +77,7 @@ export const Config: Schema<Config> = Schema.intersect([
   ])
 ]);
 
-export function apply(ctx: Context, config: Config)
-{
+export function apply(ctx: Context, config: Config) {
   const logger = ctx.logger('iirose-stock-monitor');
   ctx.i18n.define("zh-CN", {
     commands: {
@@ -176,32 +177,26 @@ export function apply(ctx: Context, config: Config)
    * @param unit - 单位 (可选)
    * @returns 格式化后的字符串
    */
-  function formatChange(value: number, precision: number, unit: string = ''): string
-  {
+  function formatChange(value: number, precision: number, unit: string = ''): string {
     const sign = value > 0 ? '+' : '';
     return `${sign}${value.toFixed(precision)}${unit}`;
   }
 
   // 消息发送函数，会遍历配置表中的所有机器人和频道
-  const sendMessage = async (content: string | h) =>
-  {
+  const sendMessage = async (content: string | h) => {
     if (!config.botTable || config.botTable.length === 0) return;
 
-    for (const botInfo of config.botTable)
-    {
+    for (const botInfo of config.botTable) {
       if (!botInfo.botId || !botInfo.channelId) continue;
 
       const bot = ctx.bots.find(b => b.selfId === botInfo.botId || b.user?.id === botInfo.botId);
-      if (!bot || bot.status !== Universal.Status.ONLINE)
-      {
+      if (!bot || bot.status !== Universal.Status.ONLINE) {
         logger.error(t('botOffline', { 0: botInfo.botId }));
         continue;
       }
-      try
-      {
+      try {
         await bot.sendMessage(botInfo.channelId, content);
-      } catch (error)
-      {
+      } catch (error) {
         logger.error(t('sendFailed', { 0: botInfo.channelId }), error);
       }
     }
@@ -210,24 +205,21 @@ export function apply(ctx: Context, config: Config)
   // #region 指令
   ctx.command('iirose.stock.on', '开启股票监听功能')
     .alias('股票播报开启')
-    .action(() =>
-    {
+    .action(() => {
       stockState.isOpen = true;
       return t('stockon');
     });
 
   ctx.command('iirose.stock.off', '关闭股票监听功能')
     .alias('股票播报关闭')
-    .action(() =>
-    {
+    .action(() => {
       stockState.isOpen = false;
       return t('stockoff');
     });
 
   ctx.command('iirose.stock.clean', '清除历史股票数据')
     .alias('清空股票数据')
-    .action(() =>
-    {
+    .action(() => {
       stockState.history.price = [];
       stockState.history.time = [];
       stockState.nowData = null;
@@ -235,77 +227,67 @@ export function apply(ctx: Context, config: Config)
     });
   // #endregion
 
-  // 使用 ctx.inject 
-  // 不然 dev模式会有前端卡死的问题
-  ctx.inject(['echarts'], (ctx) =>
-  {
-    const echartsOption: EchartsOption = {
-      backgroundColor: 'rgba(254,248,239,1)',
-      color: ["#d87c7c", "#919e8b", "#d7ab82", "#6e7074", "#61a0a8", "#efa18d", "#787464", "#cc7e63", "#724e58", "#4b565b"],
-      xAxis: {
-        type: 'category',
-        data: [],
-        axisLine: { show: true, lineStyle: { color: '#333333' } },
-        axisTick: { show: true, lineStyle: { color: '#333333' } },
-        axisLabel: { show: true, color: '#333' },
-        splitLine: { show: false }
-      },
-      yAxis: {
-        type: 'value',
-        axisLine: { show: true, lineStyle: { color: '#333' } },
-        axisTick: { show: true, lineStyle: { color: '#333' } },
-        axisLabel: { show: true, color: '#333' },
-        splitLine: { show: true, lineStyle: { color: '#ccc' } }
-      },
-      series: [{
-        data: [],
-        type: 'line',
-        lineStyle: { width: 2 },
-        symbol: 'emptyCircle',
-        symbolSize: 8,
-        itemStyle: { borderWidth: 2 },
-        smooth: false,
-        label: { show: true, position: 'top' },
-        markLine: { data: [{ type: 'average', name: 'Avg' }] }
-      }]
-    };
+  const echartsOption: EchartsOption = {
+    backgroundColor: 'rgba(254,248,239,1)',
+    color: ["#d87c7c", "#919e8b", "#d7ab82", "#6e7074", "#61a0a8", "#efa18d", "#787464", "#cc7e63", "#724e58", "#4b565b"],
+    xAxis: {
+      type: 'category',
+      data: [],
+      axisLine: { show: true, lineStyle: { color: '#333333' } },
+      axisTick: { show: true, lineStyle: { color: '#333333' } },
+      axisLabel: { show: true, color: '#333' },
+      splitLine: { show: false }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { show: true, lineStyle: { color: '#333' } },
+      axisTick: { show: true, lineStyle: { color: '#333' } },
+      axisLabel: { show: true, color: '#333' },
+      splitLine: { show: true, lineStyle: { color: '#ccc' } }
+    },
+    series: [{
+      data: [],
+      type: 'line',
+      lineStyle: { width: 2 },
+      symbol: 'emptyCircle',
+      symbolSize: 8,
+      itemStyle: { borderWidth: 2 },
+      smooth: false,
+      label: { show: true, position: 'top' },
+      markLine: { data: [{ type: 'average', name: 'Avg' }] }
+    }]
+  };
 
-    const getMiddleRange = (array: any[], minPercent: number, maxPercent: number) =>
-    {
-      const length = array.length;
-      const start = Math.floor((minPercent / 100) * length);
-      const end = Math.floor((maxPercent / 100) * length);
-      return array.slice(start, end);
-    };
+  const getMiddleRange = (array: any[], minPercent: number, maxPercent: number) => {
+    const length = array.length;
+    const start = Math.floor((minPercent / 100) * length);
+    const end = Math.floor((maxPercent / 100) * length);
+    return array.slice(start, end);
+  };
 
-    ctx.command('iirose.stock.chart', '查看本轮股票的图表')
-      .alias('股票图表')
-      .option('max', '-m [max:number] 最大显示百上限', { fallback: 100 })
-      .option('min', '-n [min:number] 显示百分比下限', { fallback: 0 })
-      .action(async ({ options }) =>
-      {
-        if (stockState.history.price.length <= 0)
-        {
-          return t('noHistory');
-        }
+  ctx.command('iirose.stock.chart', '查看本轮股票的图表')
+    .alias('股票图表')
+    .option('max', '-m [max:number] 最大显示百上限', { fallback: 100 })
+    .option('min', '-n [min:number] 显示百分比下限', { fallback: 0 })
+    .action(async ({ options }) => {
+      if (stockState.history.price.length <= 0) {
+        return t('noHistory');
+      }
 
-        echartsOption.series[0].data = getMiddleRange(stockState.history.price, options.min, options.max);
-        (echartsOption.xAxis as any).data = getMiddleRange(stockState.history.time, options.min, options.max);
+      echartsOption.series[0].data = getMiddleRange(stockState.history.price, options.min, options.max);
+      (echartsOption.xAxis as any).data = getMiddleRange(stockState.history.time, options.min, options.max);
 
-        const width = (echartsOption.series[0].data.length * 100 + 100) < 1000 ? 1000 : (echartsOption.series[0].data.length * 100 + 100);
-        const chart = await ctx.echarts.createChart(width, 700, echartsOption);
+      const width = (echartsOption.series[0].data.length * 100 + 100) < 1000 ? 1000 : (echartsOption.series[0].data.length * 100 + 100);
+      const chart = await ctx.echarts.createChart(width, 700, echartsOption);
 
-        return t('chartHeader') + chart;
-      });
-  });
+      return t('chartHeader') + chart;
+    });
 
-  ctx.on('iirose/stock-update', async (data) =>
-  {
+  ctx.on('iirose/stock-update', async (data) => {
     if (!stockState.isOpen) return;
 
     const { nowData, status, history } = stockState;
-    if (!nowData)
-    {
+    if (!nowData) {
       stockState.nowData = data;
       return;
     }
@@ -314,8 +296,7 @@ export function apply(ctx: Context, config: Config)
     const message: string[] = [t('reportTitle')];
 
     // 崩盘处理
-    if (data.unitPrice === 1 && data.totalStock === 1000)
-    {
+    if (data.unitPrice === 1 && data.totalStock === 1000) {
       status.up = 0;
       status.down = 0;
       message.push(t('crashed'), t('crashInfo', { 0: nowData.totalStock }));
@@ -323,8 +304,7 @@ export function apply(ctx: Context, config: Config)
       if (config.sendTextAfterCrash) await sendMessage(message.join('\n'));
 
       // 发送图表
-      if (config.sendChartAfterCrash && ctx.echarts)
-      {
+      if (config.sendChartAfterCrash && ctx.echarts) {
         const echartsOption: EchartsOption = {
           backgroundColor: 'rgba(254,248,239,1)',
           color: ["#d87c7c", "#919e8b", "#d7ab82", "#6e7074", "#61a0a8", "#efa18d", "#787464", "#cc7e63", "#724e58", "#4b565b"],
@@ -357,8 +337,7 @@ export function apply(ctx: Context, config: Config)
     // 记录历史数据 (每 1.5 分钟一次)
     const now = new Date();
     const lastTime = history.time[history.time.length - 1];
-    if ((!lastTime || (now.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(lastTime.split(':')[0]), parseInt(lastTime.split(':')[1])).getTime()) > 90000) && data.unitPrice !== nowData.unitPrice)
-    {
+    if ((!lastTime || (now.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(lastTime.split(':')[0]), parseInt(lastTime.split(':')[1])).getTime()) > 90000) && data.unitPrice !== nowData.unitPrice) {
       history.price.push(data.unitPrice);
       history.time.push(`${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`);
     }
@@ -368,15 +347,13 @@ export function apply(ctx: Context, config: Config)
     const priceChangePercent = (priceChange / nowData.unitPrice) * 100;
 
     // 涨跌趋势播报
-    if (priceChange > 0)
-    {
+    if (priceChange > 0) {
       status.up++;
       status.down = 0;
       const riseText = status.up === 1 ? t('rising') : t('riseCount', { 0: status.up });
       const riseDetailText = t('riseDetails', { 0: priceChange.toFixed(4), 1: priceChangePercent.toFixed(2) });
       message.push(riseText, riseDetailText);
-    } else if (priceChange < 0)
-    {
+    } else if (priceChange < 0) {
       status.down++;
       status.up = 0;
       const fallText = status.down === 1 ? t('falling') : t('fallCount', { 0: status.down });
@@ -396,8 +373,7 @@ export function apply(ctx: Context, config: Config)
     const volumePercentFormatted = formatChange(volumeChangePercent, 2, '%');
     message.push(t('volumeReport', { 0: data.totalStock, 1: volumeChangeFormatted, 2: volumePercentFormatted }));
 
-    if (config.enableTotalMoney)
-    {
+    if (config.enableTotalMoney) {
       const moneyChange = data.totalMoney - nowData.totalMoney;
       const moneyChangePercent = (moneyChange / nowData.totalMoney) * 100;
       const moneyChangeFormatted = formatChange(moneyChange, 0, '钞');
@@ -406,23 +382,18 @@ export function apply(ctx: Context, config: Config)
     }
 
     // 策略建议播报
-    if (config.enableSuggestion)
-    {
+    if (config.enableSuggestion) {
       const { buyStrategies, sellStrategies, buyComboStrategies, sellComboStrategies } = config;
-      if (buyStrategies && data.unitPrice >= buyStrategies[0] && data.unitPrice <= buyStrategies[1] && data.unitPrice >= 0.1)
-      {
+      if (buyStrategies && data.unitPrice >= buyStrategies[0] && data.unitPrice <= buyStrategies[1] && data.unitPrice >= 0.1) {
         message.push(t('buySuggestionRange', { 0: data.unitPrice, 1: buyStrategies[0], 2: buyStrategies[1] }));
       }
-      if (sellStrategies && data.unitPrice >= sellStrategies[0] && data.unitPrice <= sellStrategies[1])
-      {
+      if (sellStrategies && data.unitPrice >= sellStrategies[0] && data.unitPrice <= sellStrategies[1]) {
         message.push(t('sellSuggestionRange', { 0: data.unitPrice, 1: sellStrategies[0], 2: sellStrategies[1] }));
       }
-      if (buyComboStrategies && status.down >= buyComboStrategies && data.unitPrice >= 0.1)
-      {
+      if (buyComboStrategies && status.down >= buyComboStrategies && data.unitPrice >= 0.1) {
         message.push(t('buySuggestionCombo', { 0: status.down }));
       }
-      if (sellComboStrategies && status.up >= sellComboStrategies)
-      {
+      if (sellComboStrategies && status.up >= sellComboStrategies) {
         message.push(t('sellSuggestionCombo', { 0: status.up }));
       }
     }
@@ -431,9 +402,10 @@ export function apply(ctx: Context, config: Config)
     stockState.nowData = data;
 
     // 检查是否配置了推送目标
-    if (config.botTable && config.botTable.some(bot => bot.botId && bot.channelId))
-    {
+    if (config.botTable && config.botTable.some(bot => bot.botId && bot.channelId)) {
       await sendMessage(message.join('\n'));
     }
   });
+
+
 }
